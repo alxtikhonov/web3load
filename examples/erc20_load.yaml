@@ -1,0 +1,51 @@
+version: "0.1"
+
+target:
+  rpc_url: "http://127.0.0.1:8545"
+  chain_id: 31337
+  environment: local
+
+scenario:
+  name: erc20_load
+
+load:
+  type: ramping
+  stages:
+    - { duration: 30s, target: 10 }
+    - { duration: 2m, target: 100 }
+    - { duration: 30s, target: 0 }
+
+wallets:
+  count: 1000
+
+variables:
+  # replace with the address of an ERC-20 you deployed on your local Anvil
+  token: "0x5FbDB2315678afecb367f032d93F642f64180aa"
+  spender: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+
+steps:
+  - action: get_balance
+    save_as: balance_before
+
+  - action: approve
+    token: ${token}
+    spender: ${spender}
+    amount: "1000000000000000000000"
+    wait_for_confirmation: true
+
+  - action: erc20_transfer
+    token: ${token}
+    to: ${spender}
+    amount: "1000000000000000000"
+    wait_for_confirmation: true
+
+  - think: 500ms
+
+assertions:
+  - transaction_success_rate > 99%
+  - rpc_p95 < 500ms
+  - confirmation_p95 < 30s
+  - gas_used_p95 < 250000
+
+safety:
+  allowed_chain_ids: [31337]

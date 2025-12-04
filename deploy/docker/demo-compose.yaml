@@ -1,0 +1,25 @@
+# Minimal observability stack for the demo in README.md / docs/dsl-reference.md.
+# `web3load run` itself stays on the host (or run it in a container on the
+# same network and point prometheus.yml at that hostname instead).
+#
+#   docker compose -f deploy/docker/demo-compose.yaml up
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ../prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9091:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    depends_on:
+      - prometheus

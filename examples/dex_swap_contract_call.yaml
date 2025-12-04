@@ -1,0 +1,54 @@
+version: "0.1"
+
+# Demonstrates contract_call as the general escape hatch: a full DEX swap
+# without any core engine code knowing what "swap" means. Addresses below
+# are the real Ethereum mainnet USDC/WETH/UniswapV2Router02 addresses —
+# replace `rpc_url`/`chain_id` with a fork or your own local deployment
+# before running this for real.
+
+target:
+  rpc_url: "http://127.0.0.1:8545"
+  chain_id: 31337
+  environment: local
+
+scenario:
+  name: dex_swap
+
+load:
+  type: ramping
+  stages:
+    - { duration: 2m, target: 10 }
+    - { duration: 6m, target: 1000 }
+    - { duration: 2m, target: 0 }
+
+wallets:
+  count: 5000
+
+variables:
+  usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+  weth: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"
+  router: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
+
+steps:
+  - action: approve
+    token: ${usdc}
+    spender: ${router}
+    amount: "1000000000000"
+    wait_for_confirmation: true
+
+  - action: contract_call
+    contract: ${router}
+    abi_file: examples/abis/UniswapV2Router.json
+    method: swapExactTokensForTokens
+    # deadline is a literal unix timestamp: ${now + 300} relative-time
+    # expressions are not supported in v0.1 (see docs/dsl-reference.md)
+    args: [100000000, 0, ["${usdc}", "${weth}"], "${wallet.address}", 1893456000]
+    wait_for_confirmation: true
+
+assertions:
+  - transaction_success_rate > 99%
+  - rpc_p95 < 500ms
+  - confirmation_p95 < 30s
+
+safety:
+  allowed_chain_ids: [31337, 1]

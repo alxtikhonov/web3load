@@ -1,0 +1,38 @@
+version: "0.1"
+
+target:
+  rpc_url: "http://127.0.0.1:8545"
+  chain_id: 31337
+  environment: local
+
+scenario:
+  name: native_transfer_smoke
+
+load:
+  type: constant
+  vus: 20
+  duration: 30s
+
+wallets:
+  count: 20
+
+variables:
+  recipient: "0x000000000000000000000000000000000000dEaD"
+
+steps:
+  - action: get_balance
+    save_as: balance_before
+
+  - action: transfer
+    to: ${recipient}
+    amount: "1000000000000000" # 0.001 native token, in wei
+    wait_for_confirmation: true
+
+assertions:
+  - transaction_success_rate > 99%
+  - rpc_p95 < 500ms
+  - confirmation_p95 < 10s
+
+safety:
+  max_spend_per_wallet_native: "10000000000000000" # 0.01 native token
+  allowed_chain_ids: [31337]
