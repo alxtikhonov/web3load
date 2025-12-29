@@ -1,5 +1,12 @@
 # Web3Load
 
+[![CI](https://github.com/alxtikhonov/web3load/actions/workflows/ci.yml/badge.svg)](https://github.com/alxtikhonov/web3load/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/alxtikhonov/web3load)](https://goreportcard.com/report/github.com/alxtikhonov/web3load)
+[![Go Reference](https://pkg.go.dev/badge/github.com/alxtikhonov/web3load.svg)](https://pkg.go.dev/github.com/alxtikhonov/web3load)
+![Go version](https://img.shields.io/github/go-mod/go-version/alxtikhonov/web3load)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Status](https://img.shields.io/badge/status-v0.1%20MVP-orange)
+
 **Load testing for blockchain infrastructure — the way k6 does it for APIs.**
 
 Web3Load is an open-source, single-binary load testing framework built for
