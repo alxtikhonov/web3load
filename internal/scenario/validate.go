@@ -67,29 +67,60 @@ func (t Target) validate() error {
 
 func (l Load) validate() error {
 	switch l.Type {
-	case "constant":
+	case "constant", "soak":
 		if l.VUs <= 0 {
-			return fmt.Errorf("load.vus must be > 0 for constant load")
+			return fmt.Errorf("load.vus must be > 0 for %s load", l.Type)
 		}
 		if l.Duration.AsTime() <= 0 {
-			return fmt.Errorf("load.duration must be > 0 for constant load")
+			return fmt.Errorf("load.duration must be > 0 for %s load", l.Type)
 		}
 	case "ramping":
 		if len(l.Stages) == 0 {
 			return fmt.Errorf("load.stages must have at least one stage for ramping load")
 		}
-		for i, st := range l.Stages {
-			if st.Duration.AsTime() <= 0 {
-				return fmt.Errorf("load.stages[%d].duration must be > 0", i)
-			}
-			if st.Target < 0 {
-				return fmt.Errorf("load.stages[%d].target must be >= 0", i)
-			}
+		return validateStages(l)
+	case "spike":
+		if l.Target <= l.Baseline {
+			return fmt.Errorf("load.target must be greater than load.baseline for spike load")
 		}
+		if l.Before.AsTime() <= 0 || l.SpikeDuration.AsTime() <= 0 || l.After.AsTime() <= 0 {
+			return fmt.Errorf("load.before, load.spike_duration, and load.after must all be > 0 for spike load")
+		}
+		return validateStages(l)
+	case "stress":
+		if l.Step <= 0 {
+			return fmt.Errorf("load.step must be > 0 for stress load")
+		}
+		if l.Max <= l.Start {
+			return fmt.Errorf("load.max must be greater than load.start for stress load")
+		}
+		if l.StageDuration.AsTime() <= 0 {
+			return fmt.Errorf("load.stage_duration must be > 0 for stress load")
+		}
+		return validateStages(l)
 	case "":
-		return fmt.Errorf("load.type is required (constant|ramping)")
+		return fmt.Errorf("load.type is required (constant|ramping|spike|stress|soak)")
 	default:
-		return fmt.Errorf("load.type %q is not supported in v0.1 (spike/stress/soak/arrival-rate are roadmap items)", l.Type)
+		return fmt.Errorf("load.type %q is not supported in v0.1 (arrival-rate is a roadmap item)", l.Type)
+	}
+	return nil
+}
+
+// validateStages resolves spike/stress/ramping into concrete stages and
+// sanity-checks them, reusing the exact expansion the load engine will run
+// so validate can never accept something run would reject.
+func validateStages(l Load) error {
+	stages, err := l.ResolvedStages()
+	if err != nil {
+		return err
+	}
+	for i, st := range stages {
+		if st.Duration.AsTime() <= 0 {
+			return fmt.Errorf("load: resolved stage %d has non-positive duration", i)
+		}
+		if st.Target < 0 {
+			return fmt.Errorf("load: resolved stage %d has a negative target", i)
+		}
 	}
 	return nil
 }

@@ -22,9 +22,48 @@ func TestValidate_AcceptsValidScenario(t *testing.T) {
 
 func TestValidate_RejectsUnsupportedLoadType(t *testing.T) {
 	s := validScenario()
-	s.Load.Type = "spike"
+	s.Load.Type = "arrival-rate"
 	if err := s.Validate(); err == nil {
-		t.Fatal("expected spike load type to be rejected in v0.1")
+		t.Fatal("expected arrival-rate load type to be rejected in v0.1")
+	}
+}
+
+func TestValidate_AcceptsSpikeLoad(t *testing.T) {
+	s := validScenario()
+	s.Load = Load{
+		Type:          "spike",
+		Baseline:      10,
+		Target:        200,
+		Before:        Duration(1),
+		SpikeDuration: Duration(1),
+		After:         Duration(1),
+	}
+	if err := s.Validate(); err != nil {
+		t.Fatalf("expected valid spike load to pass, got: %v", err)
+	}
+}
+
+func TestValidate_RejectsSpikeWithoutRise(t *testing.T) {
+	s := validScenario()
+	s.Load = Load{Type: "spike", Baseline: 100, Target: 100, Before: Duration(1), SpikeDuration: Duration(1), After: Duration(1)}
+	if err := s.Validate(); err == nil {
+		t.Fatal("expected spike with target <= baseline to be rejected")
+	}
+}
+
+func TestValidate_AcceptsStressLoad(t *testing.T) {
+	s := validScenario()
+	s.Load = Load{Type: "stress", Start: 10, Step: 10, StageDuration: Duration(1), Max: 30}
+	if err := s.Validate(); err != nil {
+		t.Fatalf("expected valid stress load to pass, got: %v", err)
+	}
+}
+
+func TestValidate_AcceptsSoakLoad(t *testing.T) {
+	s := validScenario()
+	s.Load = Load{Type: "soak", VUs: 5, Duration: Duration(1)}
+	if err := s.Validate(); err != nil {
+		t.Fatalf("expected valid soak load to pass, got: %v", err)
 	}
 }
 

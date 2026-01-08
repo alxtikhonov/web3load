@@ -51,10 +51,51 @@ type Target struct {
 }
 
 type Load struct {
-	Type     string   `yaml:"type"` // constant | ramping
+	Type     string   `yaml:"type"` // constant | ramping | spike | stress | soak
 	VUs      int      `yaml:"vus"`
 	Duration Duration `yaml:"duration"`
 	Stages   []Stage  `yaml:"stages"`
+
+	// spike: hold at Baseline, jump to Target for SpikeDuration, drop back to
+	// Baseline for After. See docs/dsl-reference.md.
+	Baseline      int      `yaml:"baseline"`
+	Target        int      `yaml:"target"`
+	Before        Duration `yaml:"before"`
+	SpikeDuration Duration `yaml:"spike_duration"`
+	After         Duration `yaml:"after"`
+
+	// stress: staircase from Start up to Max in increments of Step, each
+	// plateau held for StageDuration.
+	Start         int      `yaml:"start"`
+	Step          int      `yaml:"step"`
+	StageDuration Duration `yaml:"stage_duration"`
+	Max           int      `yaml:"max"`
+}
+
+// ResolvedStages expands spike/stress into an explicit []Stage sequence so
+// the load engine only ever has to execute two primitives: a fixed VU count
+// (constant/soak) or a sequence of stages (ramping/spike/stress). It returns
+// an error for load types that aren't stage-based.
+func (l Load) ResolvedStages() ([]Stage, error) {
+	switch l.Type {
+	case "ramping":
+		return l.Stages, nil
+	case "spike":
+		return []Stage{
+			{Duration: l.Before, Target: l.Baseline},
+			{Duration: l.SpikeDuration, Target: l.Target},
+			{Duration: l.After, Target: l.Baseline},
+		}, nil
+	case "stress":
+		var stages []Stage
+		for target := l.Start; target < l.Max; target += l.Step {
+			stages = append(stages, Stage{Duration: l.StageDuration, Target: target})
+		}
+		stages = append(stages, Stage{Duration: l.StageDuration, Target: l.Max})
+		return stages, nil
+	default:
+		return nil, fmt.Errorf("load type %q is not stage-based", l.Type)
+	}
 }
 
 type Stage struct {
