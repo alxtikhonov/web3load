@@ -1,12 +1,16 @@
-// Package load drives the configured load model (constant or ramping in
-// v0.1), spawning and retiring virtual-user goroutines to match the target
-// concurrency over time, and runs each VU's step loop against its assigned
-// wallet.
+// Package load drives the configured load model, spawning and retiring
+// virtual-user goroutines to match the target concurrency over time, and
+// runs each VU's step loop against its assigned wallet. constant and soak
+// share one execution path (a fixed VU count held for a duration); ramping,
+// spike, and stress share another (a sequence of stages) — spike/stress are
+// expanded into stages by scenario.Load.ResolvedStages before they ever
+// reach this package, so there are only two schedulers here, not five.
 package load
 
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,6 +18,7 @@ import (
 	"github.com/web3load/web3load/internal/action"
 	"github.com/web3load/web3load/internal/metrics"
 	"github.com/web3load/web3load/internal/scenario"
+	"github.com/web3load/web3load/internal/telemetry"
 	"github.com/web3load/web3load/internal/wallet"
 )
 
@@ -34,13 +39,22 @@ func (e *Engine) Run(ctx context.Context) error {
 	if len(e.Wallets) == 0 {
 		return fmt.Errorf("load: no wallets available")
 	}
-	switch e.Scenario.Load.Type {
-	case "constant":
+
+	loadType := e.Scenario.Load.Type
+	slog.Info("load: run starting", "scenario", e.Scenario.Info.Name, "load_type", loadType, "wallets", len(e.Wallets))
+	defer slog.Info("load: run finished", "scenario", e.Scenario.Info.Name)
+
+	switch loadType {
+	case "constant", "soak":
 		return e.runConstant(ctx)
-	case "ramping":
-		return e.runRamping(ctx)
+	case "ramping", "spike", "stress":
+		stages, err := e.Scenario.Load.ResolvedStages()
+		if err != nil {
+			return err
+		}
+		return e.runRamping(ctx, stages)
 	default:
-		return fmt.Errorf("load: unsupported load type %q", e.Scenario.Load.Type)
+		return fmt.Errorf("load: unsupported load type %q", loadType)
 	}
 }
 
@@ -65,8 +79,9 @@ func (e *Engine) runConstant(ctx context.Context) error {
 // of the stage, holds it for the stage's duration, then moves to the next
 // stage. Scaling down retires the most recently spawned VUs first (a
 // simple LIFO policy), and scaling up spawns fresh ones against newly
-// assigned wallets.
-func (e *Engine) runRamping(ctx context.Context) error {
+// assigned wallets. It's shared by ramping, spike, and stress — they only
+// differ in how their stages were produced.
+func (e *Engine) runRamping(ctx context.Context, stages []scenario.Stage) error {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	active := make([]context.CancelFunc, 0)
@@ -100,7 +115,8 @@ func (e *Engine) runRamping(ctx context.Context) error {
 		active = nil
 	}
 
-	for _, stage := range e.Scenario.Load.Stages {
+	for i, stage := range stages {
+		slog.Info("load: entering stage", "stage", i, "target_vus", stage.Target, "duration", stage.Duration.AsTime())
 		scaleTo(stage.Target)
 		select {
 		case <-time.After(stage.Duration.AsTime()):
@@ -155,18 +171,26 @@ func (e *Engine) runIteration(ctx context.Context, w wallet.Wallet) {
 		act, ok := action.Get(step.Action)
 		if !ok {
 			e.Metrics.RecordError("unknown_action")
+			slog.Error("load: unknown action", "action", step.Action, "wallet", w.Address.Hex())
 			return
 		}
 
+		spanCtx, span := telemetry.StartStep(ctx, step.Action, w.Address.Hex())
 		start := time.Now()
-		res, err := act.Execute(ctx, e.Deps, step, state)
+		res, err := act.Execute(spanCtx, e.Deps, step, state)
+		telemetry.RecordOutcome(span, res.TxHash, res.GasUsed, err)
 		e.Metrics.RecordStep(step.Action, res, err, time.Since(start))
 
 		if step.SaveAs != "" && res.Value != nil {
 			state.Saved[step.SaveAs] = res.Value
 		}
 		if err != nil {
+			slog.Warn("load: step failed", "action", step.Action, "wallet", w.Address.Hex(), "error", err)
 			return
 		}
+		if res.RevertReason != "" {
+			slog.Warn("load: transaction reverted", "action", step.Action, "wallet", w.Address.Hex(), "tx_hash", res.TxHash)
+		}
+		slog.Debug("load: step ok", "action", step.Action, "wallet", w.Address.Hex(), "tx_hash", res.TxHash)
 	}
 }
