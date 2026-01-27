@@ -7,7 +7,9 @@ package txengine
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -79,6 +81,17 @@ func (e *Engine) Send(ctx context.Context, from wallet.Wallet, to *common.Addres
 	hash, err := e.Adapter.SendRawTransaction(ctx, signed.Raw)
 	if err != nil {
 		e.Nonces.Release(fromAddr, nonce)
+		if isNonceError(err) {
+			// Local nonce tracking has drifted from the chain's — most
+			// commonly after an external transaction from the same wallet,
+			// or a dropped/replaced transaction. Resync so the *next*
+			// iteration for this wallet doesn't keep failing the same way.
+			if rerr := e.Nonces.Resync(ctx, fromAddr); rerr != nil {
+				slog.Warn("txengine: nonce resync failed", "wallet", fromAddr.Hex(), "error", rerr)
+			} else {
+				slog.Info("txengine: nonce resynced after mismatch", "wallet", fromAddr.Hex())
+			}
+		}
 		return Outcome{}, fmt.Errorf("txengine: submit: %w", err)
 	}
 	out := Outcome{Hash: hash, SubmitLatency: time.Since(submitStart)}
@@ -87,6 +100,11 @@ func (e *Engine) Send(ctx context.Context, from wallet.Wallet, to *common.Addres
 		return out, nil
 	}
 	return e.waitForConfirmation(ctx, out)
+}
+
+func isNonceError(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "nonce too low") || strings.Contains(msg, "nonce too high")
 }
 
 func (e *Engine) waitForConfirmation(ctx context.Context, out Outcome) (Outcome, error) {
