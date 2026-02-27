@@ -6,6 +6,9 @@ require (
 	github.com/ethereum/go-ethereum v1.14.11
 	github.com/prometheus/client_golang v1.20.5
 	github.com/spf13/cobra v1.8.1
+	go.opentelemetry.io/otel v1.30.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.30.0
+	go.opentelemetry.io/otel/sdk v1.30.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
