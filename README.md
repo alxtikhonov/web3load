@@ -5,7 +5,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/alxtikhonov/web3load.svg)](https://pkg.go.dev/github.com/alxtikhonov/web3load)
 ![Go version](https://img.shields.io/github/go-mod/go-version/alxtikhonov/web3load)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Status](https://img.shields.io/badge/status-v0.1%20MVP-orange)
+![Status](https://img.shields.io/badge/status-v0.2%20in%20progress-orange)
 
 **Load testing for blockchain infrastructure — the way k6 does it for APIs.**
 
@@ -29,8 +29,9 @@ See [docs/architecture](docs/) for the full design rationale.
 
 ## Status
 
-**v0.1 (MVP)** — EVM only, single-process, tested against [Anvil](https://book.getfoundry.sh/anvil/).
-Constant and ramping load models. See the roadmap below for what's next.
+**v0.1 MVP shipped; v0.2 in progress** — EVM only, single-process, tested
+against [Anvil](https://book.getfoundry.sh/anvil/). Constant, ramping,
+spike, stress, and soak load models. See the roadmap below for what's next.
 
 ## Quickstart
 
@@ -90,25 +91,26 @@ can be driven from a scenario without a core code change. `approve` and
 `transfer` are just pre-baked conveniences over the same mechanism. See
 [docs/dsl-reference.md](docs/dsl-reference.md) for the full schema.
 
-## What's in v0.1
+## What's in
 
 - `web3load validate` / `run` / `wallets generate` / `wallets fund` / `report`
-- Load models: `constant`, `ramping`
+- Load models: `constant`, `ramping`, `spike`, `stress`, `soak` (`arrival-rate` stays roadmap — see [docs/dsl-reference.md](docs/dsl-reference.md#load-models))
 - Actions: `get_balance`, `transfer`, `erc20_transfer`, `approve`, `contract_call`
 - EVM chain adapter (works against any EVM-compatible RPC, tested on Anvil)
-- Nonce management safe under concurrent virtual users
+- Nonce management safe under concurrent virtual users, with automatic resync on a nonce mismatch
 - Console + JSON reports, scenario assertions with pass/fail exit code
-- Optional Prometheus `/metrics` endpoint during a run
+- Structured logs (`--log-level`, `--log-format`) and periodic progress snapshots (`--progress-interval`) — see [docs/observability.md](docs/observability.md)
+- Optional Prometheus `/metrics` endpoint and OpenTelemetry trace export (`--otel-endpoint`) during a run
 
-Not yet: distributed load generation, spike/stress/soak load models,
-encrypted keystores, dynamic plugins, non-EVM chains. See the roadmap.
+Not yet: distributed load generation, encrypted keystores, dynamic plugins,
+non-EVM chains, arrival-rate load. See the roadmap.
 
 ## Roadmap
 
 | Version | Focus |
 |---|---|
 | v0.1 | MVP: constant/ramping load, EVM, wallet+nonce management, core actions |
-| v0.2 | spike/stress/soak/arrival-rate load, Grafana dashboards, OpenTelemetry, encrypted keystore |
+| v0.2 | ✅ spike/stress/soak load, structured logs, OpenTelemetry tracing · ⏳ arrival-rate load, Grafana dashboards, encrypted keystore |
 | v0.3 | Distributed mode (controller/worker), plugin system, experimental Solana adapter |
 | v1.0 | Stable DSL/schema, Solana GA, adapter conformance suite, docs site |
 

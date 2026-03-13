@@ -1,0 +1,42 @@
+version: "0.1"
+
+# Soak/endurance test: a fixed VU count held for a long duration, to catch
+# degradation (leaks, growing latency, creeping nonce drift) that a short
+# run wouldn't surface. Mechanically identical to `constant` — the distinct
+# type exists so the scenario documents its own intent. Pair with
+# `--progress-interval` on `run` to see periodic snapshots instead of
+# waiting hours for the final report.
+
+target:
+  rpc_url: "http://127.0.0.1:8545"
+  chain_id: 31337
+  environment: local
+
+scenario:
+  name: soak_test
+
+load:
+  type: soak
+  vus: 50
+  duration: 4h
+
+wallets:
+  count: 50
+
+variables:
+  recipient: "0x000000000000000000000000000000000000dEaD"
+
+steps:
+  - action: transfer
+    to: ${recipient}
+    amount: "1000000000000000"
+    wait_for_confirmation: true
+
+  - think: 2s
+
+assertions:
+  - transaction_success_rate > 99%
+  - nonce_errors == 0
+
+safety:
+  allowed_chain_ids: [31337]

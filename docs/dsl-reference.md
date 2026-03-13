@@ -43,11 +43,15 @@ Unknown top-level or step fields are a parse error (strict YAML decoding) —
 this is deliberate: it's also what stops an inline `private_key:` field from
 being silently accepted anywhere in a scenario.
 
-## Load models (v0.1)
+## Load models
 
-Only `constant` and `ramping` ship in v0.1. `spike`, `stress`, `soak`, and
-`arrival-rate` are v0.2 roadmap items — they're parameterizations of the same
-scheduler, not a different engine.
+`constant`, `ramping`, `spike`, `stress`, and `soak` ship. `arrival-rate`
+remains a roadmap item — it needs a genuinely different scheduler (rate of
+new iterations, decoupled from concurrent VU count), whereas the other five
+are all parameterizations of one of two primitives the load engine actually
+runs: a fixed VU count held for a duration, or a sequence of `{duration,
+target}` stages. `spike` and `stress` are expanded into stages by
+`scenario.Load.ResolvedStages` before the engine ever sees them.
 
 ```yaml
 load:
@@ -65,10 +69,49 @@ load:
     - { duration: 2m, target: 0 }
 ```
 
+`spike`: hold at `baseline`, jump abruptly to `target`, hold, then drop back
+to `baseline` — for observing behavior during and after a sudden burst
+(examples/spike_test.yaml):
+
+```yaml
+load:
+  type: spike
+  baseline: 10
+  target: 500
+  before: 30s          # hold baseline before the spike
+  spike_duration: 20s  # hold at target
+  after: 30s           # hold baseline again, to observe recovery
+```
+
+`stress`: staircase from `start` up to `max` in `step` increments, each
+plateau held for `stage_duration` — the standard way to find where success
+rate or latency starts degrading (examples/stress_test.yaml):
+
+```yaml
+load:
+  type: stress
+  start: 20
+  step: 50
+  stage_duration: 1m
+  max: 500
+```
+
+`soak`: mechanically identical to `constant` (fixed `vus` for `duration`);
+the separate type exists so a long endurance run documents its own intent
+(examples/soak_test.yaml). Pair it with `run --progress-interval` (below)
+to see periodic snapshots instead of waiting hours for the final report.
+
+```yaml
+load:
+  type: soak
+  vus: 50
+  duration: 4h
+```
+
 Each virtual user is assigned a wallet round-robin from the keystore and
 repeats `steps` in a loop for as long as it's kept alive. `wallets.count`
-should generally be >= the peak `target` so no two concurrently active VUs
-ever share a wallet's in-flight nonce.
+should generally be >= the peak concurrent VU target so no two concurrently
+active VUs ever share a wallet's in-flight nonce.
 
 ## Variable substitution
 

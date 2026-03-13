@@ -1,0 +1,41 @@
+version: "0.1"
+
+# Spike test: hold a small baseline, jump abruptly to a much higher VU count,
+# then drop back to baseline to observe recovery (error rate, latency
+# settling back down). Internally expanded into 3 ramping stages — see
+# scenario.Load.ResolvedStages.
+
+target:
+  rpc_url: "http://127.0.0.1:8545"
+  chain_id: 31337
+  environment: local
+
+scenario:
+  name: spike_test
+
+load:
+  type: spike
+  baseline: 10
+  target: 500
+  before: 30s        # hold baseline before the spike
+  spike_duration: 20s # hold at target
+  after: 30s          # hold baseline again, to observe recovery
+
+wallets:
+  count: 500
+
+variables:
+  recipient: "0x000000000000000000000000000000000000dEaD"
+
+steps:
+  - action: transfer
+    to: ${recipient}
+    amount: "1000000000000000"
+    wait_for_confirmation: true
+
+assertions:
+  - transaction_success_rate > 95%
+  - confirmation_p95 < 30s
+
+safety:
+  allowed_chain_ids: [31337]

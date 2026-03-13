@@ -1,0 +1,40 @@
+version: "0.1"
+
+# Stress test: staircase from `start` up to `max` VUs in `step` increments,
+# each plateau held for `stage_duration` — the standard way to find where
+# success rate/latency starts degrading under increasing load. Internally
+# expanded into N ramping stages — see scenario.Load.ResolvedStages.
+
+target:
+  rpc_url: "http://127.0.0.1:8545"
+  chain_id: 31337
+  environment: local
+
+scenario:
+  name: stress_test
+
+load:
+  type: stress
+  start: 20
+  step: 50
+  stage_duration: 1m
+  max: 500
+
+wallets:
+  count: 500
+
+variables:
+  recipient: "0x000000000000000000000000000000000000dEaD"
+
+steps:
+  - action: transfer
+    to: ${recipient}
+    amount: "1000000000000000"
+    wait_for_confirmation: true
+
+assertions:
+  - reverted_transactions < 50
+  - nonce_errors == 0
+
+safety:
+  allowed_chain_ids: [31337]
