@@ -8,11 +8,17 @@
 - Never logged: `wallet.Wallet` implements `String()` so the private key is
   redacted in any `%v`/`%s`/`%+v` format, including accidental
   `fmt.Println(wallet)` calls.
-- **v0.1 keystores (`wallets.json`) are plaintext on disk.** `wallets
-  generate` prints an explicit warning about this. Treat the file like a
-  secret: don't commit it, don't reuse it against a chain holding real
-  value. Encrypted keystores (scrypt + AES-GCM) are a v0.2 commitment, not a
-  "maybe."
+- **Keystores are plaintext on disk by default.** Pass `--password` (or,
+  preferably, set `WEB3LOAD_KEYSTORE_PASSWORD` — the env var never lands in
+  shell history or a process listing the way a flag can) to
+  `wallets generate` to encrypt at rest instead: scrypt (N=32768, r=8, p=1)
+  derives an AES-256-GCM key from the password, following the same
+  parameters geth/ethers keystores use. `run` and `wallets fund` both
+  auto-detect the format (`wallet.LoadAny`) and accept the same
+  `--password`/env var. Without a password, the file stays plaintext and
+  `wallets generate` prints an explicit warning. Either way, treat the file
+  like a secret: don't commit it, and remember a wrong or lost password is
+  unrecoverable — there's no backdoor by design.
 - RPC URLs/credentials are read from `${ENV_VAR}` references, never written
   into scenario files or logs in resolved form.
 

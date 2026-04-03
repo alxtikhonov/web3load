@@ -117,10 +117,11 @@ non-EVM chains, arrival-rate load. See the roadmap.
 ## Security
 
 Private keys never appear in logs or scenario files — only keystore
-references. v0.1 keystores are plaintext on disk (encryption lands in v0.2);
-treat `wallets.json` like a secret. `production` environments require an
-explicit typed confirmation before any transaction is broadcast. See
-[docs/security.md](docs/security.md).
+references. Keystores are plaintext by default; pass `--password` (or set
+`WEB3LOAD_KEYSTORE_PASSWORD`) to `wallets generate` to encrypt at rest
+(scrypt + AES-256-GCM). Either way, treat `wallets.json` like a secret.
+`production` environments require an explicit typed confirmation before any
+transaction is broadcast. See [docs/security.md](docs/security.md).
 
 ## Contributing
 

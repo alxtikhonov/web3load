@@ -22,7 +22,7 @@ import (
 )
 
 func newRunCmd() *cobra.Command {
-	var walletsPath, out, metricsAddr, otelEndpoint string
+	var walletsPath, out, metricsAddr, otelEndpoint, password string
 	var dryRun bool
 	var progressInterval time.Duration
 	c := &cobra.Command{
@@ -41,7 +41,7 @@ func newRunCmd() *cobra.Command {
 				}
 			}
 
-			ks, err := wallet.Load(walletsPath)
+			ks, err := wallet.LoadAny(walletsPath, resolvePassword(password))
 			if err != nil {
 				return fmt.Errorf("run: %w (generate one with 'web3load wallets generate')", err)
 			}
@@ -130,6 +130,7 @@ func newRunCmd() *cobra.Command {
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "estimate gas without broadcasting (partial in v0.1, see docs/security.md)")
 	c.Flags().StringVar(&otelEndpoint, "otel-endpoint", "", "OTLP/HTTP collector host:port to send trace spans to (e.g. localhost:4318); unset disables tracing")
 	c.Flags().DurationVar(&progressInterval, "progress-interval", 30*time.Second, "how often to log a progress snapshot; 0 disables it (useful for soak tests)")
+	c.Flags().StringVar(&password, "password", "", "password for an encrypted keystore (or set "+keystorePasswordEnvVar+")")
 	return c
 }
 

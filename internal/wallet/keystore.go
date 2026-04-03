@@ -37,7 +37,8 @@ func Generate(count int) (*Keystore, error) {
 }
 
 // Save writes the keystore as plaintext JSON with owner-only permissions.
-// v0.1 ships without encryption at rest; see docs/security.md.
+// Prefer SaveEncrypted whenever the keystore might touch a real network —
+// see docs/security.md.
 func (ks *Keystore) Save(path string) error {
 	data, err := json.MarshalIndent(ks, "", "  ")
 	if err != nil {
