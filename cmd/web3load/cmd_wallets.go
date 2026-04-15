@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -11,6 +12,19 @@ import (
 	"github.com/web3load/web3load/internal/chain/evm"
 	"github.com/web3load/web3load/internal/wallet"
 )
+
+// keystorePasswordEnvVar lets a password be supplied without ever appearing
+// in shell history or a process listing, which --password unavoidably does.
+const keystorePasswordEnvVar = "WEB3LOAD_KEYSTORE_PASSWORD"
+
+// resolvePassword prefers an explicit --password flag but falls back to
+// keystorePasswordEnvVar; an empty result means "use a plaintext keystore".
+func resolvePassword(flagValue string) string {
+	if flagValue != "" {
+		return flagValue
+	}
+	return os.Getenv(keystorePasswordEnvVar)
+}
 
 func newWalletsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "wallets", Short: "Generate and fund test wallets"}
@@ -21,37 +35,48 @@ func newWalletsCmd() *cobra.Command {
 
 func newWalletsGenerateCmd() *cobra.Command {
 	var count int
-	var out string
+	var out, password string
 	c := &cobra.Command{
 		Use:   "generate",
-		Short: "Generate N wallets into a keystore file (plaintext in v0.1 — see docs/security.md)",
+		Short: "Generate N wallets into a keystore file",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ks, err := wallet.Generate(count)
 			if err != nil {
 				return err
 			}
+
+			pw := resolvePassword(password)
+			if pw != "" {
+				if err := ks.SaveEncrypted(out, pw); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "generated %d wallets -> %s (encrypted, scrypt+AES-256-GCM)\n", len(ks.Wallets), out)
+				return nil
+			}
+
 			if err := ks.Save(out); err != nil {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "generated %d wallets -> %s\n", len(ks.Wallets), out)
-			fmt.Fprintln(cmd.OutOrStdout(), "WARNING: v0.1 keystores are plaintext. Do not commit this file or use it on a network holding real funds.")
+			fmt.Fprintf(cmd.OutOrStdout(), "WARNING: this keystore is plaintext. Pass --password or set %s to encrypt it at rest — see docs/security.md.\n", keystorePasswordEnvVar)
 			return nil
 		},
 	}
 	c.Flags().IntVar(&count, "count", 10, "number of wallets to generate")
 	c.Flags().StringVar(&out, "out", "wallets.json", "output keystore path")
+	c.Flags().StringVar(&password, "password", "", "encrypt the keystore with this password (prefer "+keystorePasswordEnvVar+" over this flag to avoid it landing in shell history)")
 	return c
 }
 
 func newWalletsFundCmd() *cobra.Command {
-	var walletsPath, rpcURL, fromKey, native string
+	var walletsPath, rpcURL, fromKey, native, password string
 	var chainID int64
 	var timeout time.Duration
 	c := &cobra.Command{
 		Use:   "fund",
 		Short: "Fund every wallet in a keystore with native currency from a funder key",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ks, err := wallet.Load(walletsPath)
+			ks, err := wallet.LoadAny(walletsPath, resolvePassword(password))
 			if err != nil {
 				return err
 			}
@@ -90,6 +115,7 @@ func newWalletsFundCmd() *cobra.Command {
 	c.Flags().StringVar(&fromKey, "from", "", "funder private key (hex, 0x-prefixed)")
 	c.Flags().StringVar(&native, "native", "1000000000000000000", "amount to send to each wallet, in wei")
 	c.Flags().DurationVar(&timeout, "confirm-timeout", 30*time.Second, "per-transfer confirmation timeout")
+	c.Flags().StringVar(&password, "password", "", "password for an encrypted keystore (or set "+keystorePasswordEnvVar+")")
 	_ = c.MarkFlagRequired("from")
 	return c
 }
