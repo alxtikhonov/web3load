@@ -126,6 +126,19 @@ type Step struct {
 	Args                 []interface{} `yaml:"args"`
 	WaitForConfirmation  bool          `yaml:"wait_for_confirmation"`
 	Think                Duration      `yaml:"think"`
+	Retry                *RetryPolicy  `yaml:"retry"`
+}
+
+// RetryPolicy re-runs a failed step up to MaxAttempts times with
+// exponentially increasing delay starting at BaseDelay. The load engine
+// only retries a failure that happened before a transaction was ever
+// broadcast (nonce/fee/gas-estimation/signing errors, or the RPC rejecting
+// the submission outright) — once a transaction is known to be in the
+// mempool, retrying could double-send, so that class of failure is never
+// retried regardless of this policy. See internal/load's executeWithRetry.
+type RetryPolicy struct {
+	MaxAttempts int      `yaml:"max_attempts"`
+	BaseDelay   Duration `yaml:"base_delay"`
 }
 
 type Safety struct {

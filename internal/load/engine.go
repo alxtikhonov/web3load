@@ -175,10 +175,8 @@ func (e *Engine) runIteration(ctx context.Context, w wallet.Wallet) {
 			return
 		}
 
-		spanCtx, span := telemetry.StartStep(ctx, step.Action, w.Address.Hex())
 		start := time.Now()
-		res, err := act.Execute(spanCtx, e.Deps, step, state)
-		telemetry.RecordOutcome(span, res.TxHash, res.GasUsed, err)
+		res, err := e.executeWithRetry(ctx, act, step, state, w)
 		e.Metrics.RecordStep(step.Action, res, err, time.Since(start))
 
 		if step.SaveAs != "" && res.Value != nil {
@@ -193,4 +191,41 @@ func (e *Engine) runIteration(ctx context.Context, w wallet.Wallet) {
 		}
 		slog.Debug("load: step ok", "action", step.Action, "wallet", w.Address.Hex(), "tx_hash", res.TxHash)
 	}
+}
+
+// executeWithRetry runs one step, retrying per step.Retry (default: no
+// retry) with exponential backoff. It only retries a failure that left no
+// tx_hash behind — meaning nothing was ever broadcast — because retrying
+// after a transaction is already in the mempool could double-send. A
+// confirmation timeout after successful submission is therefore never
+// retried here regardless of the configured policy.
+func (e *Engine) executeWithRetry(ctx context.Context, act action.Action, step scenario.Step, state *action.VUState, w wallet.Wallet) (action.Result, error) {
+	maxAttempts := 1
+	var baseDelay time.Duration
+	if step.Retry != nil {
+		maxAttempts = step.Retry.MaxAttempts
+		baseDelay = step.Retry.BaseDelay.AsTime()
+	}
+
+	var res action.Result
+	var err error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		spanCtx, span := telemetry.StartStep(ctx, step.Action, w.Address.Hex())
+		res, err = act.Execute(spanCtx, e.Deps, step, state)
+		telemetry.RecordOutcome(span, res.TxHash, res.GasUsed, err)
+
+		if err == nil || res.TxHash != "" || attempt == maxAttempts-1 {
+			return res, err
+		}
+
+		delay := baseDelay * time.Duration(int64(1)<<uint(attempt))
+		slog.Warn("load: step failed, retrying", "action", step.Action, "wallet", w.Address.Hex(),
+			"attempt", attempt+1, "max_attempts", maxAttempts, "delay", delay, "error", err)
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return res, ctx.Err()
+		}
+	}
+	return res, err
 }

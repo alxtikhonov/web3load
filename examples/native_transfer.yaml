@@ -22,6 +22,9 @@ variables:
 steps:
   - action: get_balance
     save_as: balance_before
+    retry:
+      max_attempts: 3
+      base_delay: 200ms
 
   - action: transfer
     to: ${recipient}
