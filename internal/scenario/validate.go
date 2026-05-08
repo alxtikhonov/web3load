@@ -138,5 +138,13 @@ func (step Step) validate(i int) error {
 	if step.Action == "contract_call" && (step.Contract == "" || step.Method == "" || step.ABIFile == "") {
 		return fmt.Errorf("steps[%d]: contract_call requires contract, abi_file, and method", i)
 	}
+	if step.Retry != nil {
+		if step.Retry.MaxAttempts < 1 {
+			return fmt.Errorf("steps[%d]: retry.max_attempts must be >= 1", i)
+		}
+		if step.Retry.BaseDelay.AsTime() < 0 {
+			return fmt.Errorf("steps[%d]: retry.base_delay must be >= 0", i)
+		}
+	}
 	return nil
 }

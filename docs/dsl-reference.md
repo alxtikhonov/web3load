@@ -191,6 +191,26 @@ that might exceed 2^63), `address` expects a hex string, `bool` a YAML
 boolean, `bytes`/`bytesN` a `0x`-prefixed hex string, and arrays/slices a
 YAML list of the element type. Tuples/structs are not supported in v0.1.
 
+## `retry`
+
+Any step can be retried on failure:
+
+```yaml
+- action: get_balance
+  retry:
+    max_attempts: 3
+    base_delay: 200ms   # doubles each attempt: 200ms, 400ms, ...
+```
+
+Retries only happen for a failure that occurred **before anything was
+broadcast** — a nonce/fee/gas-estimation/signing error, or the RPC
+rejecting the submission outright. Once a transaction is confirmed to have
+been accepted (it has a `tx_hash`), the step is never retried even if
+`wait_for_confirmation` later times out waiting for a receipt: resubmitting
+at that point could double-send. This isn't configurable — it's a
+correctness rule, not a policy default. Omitting `retry` (the common case)
+means exactly one attempt, identical to earlier versions of the DSL.
+
 ## `wait_for_confirmation`
 
 - `false` (default): the step is measured as submission latency only
