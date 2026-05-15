@@ -1,0 +1,104 @@
+{
+  "id": null,
+  "uid": "web3load-overview",
+  "title": "Web3Load Overview",
+  "description": "Live metrics from `web3load run --metrics-addr`. See deploy/grafana/README.md.",
+  "tags": ["web3load"],
+  "style": "dark",
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Throughput",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "web3load_throughput_tps", "legendFormat": "TPS", "refId": "A" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Success Rate",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "drawStyle": "line", "fillOpacity": 10 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "web3load_success_rate_percent", "legendFormat": "success rate", "refId": "A" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "RPC Latency (p95)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "web3load_rpc_latency_p95_ms", "legendFormat": "submission p95", "refId": "A" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Confirmation Latency (p95)",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "web3load_confirmation_latency_p95_ms", "legendFormat": "confirmation p95", "refId": "A" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Errors",
+      "type": "timeseries",
+      "datasource": "Prometheus",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        { "expr": "web3load_reverted_transactions_total", "legendFormat": "reverted", "refId": "A" },
+        { "expr": "web3load_nonce_errors_total", "legendFormat": "nonce errors", "refId": "B" },
+        { "expr": "web3load_rpc_errors_total", "legendFormat": "rpc errors", "refId": "C" }
+      ]
+    }
+  ]
+}
