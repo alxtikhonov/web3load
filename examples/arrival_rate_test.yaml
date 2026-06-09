@@ -1,0 +1,43 @@
+version: "0.1"
+
+# Arrival-rate test: start 50 new iterations per second for 2 minutes,
+# regardless of how long each one takes, using up to 300 concurrent workers
+# to keep up. Unlike constant/ramping/spike/stress, this controls the rate
+# new iterations *start*, not how many run concurrently — the right model
+# when the thing you're testing is "how many new user sessions per second
+# can this RPC endpoint absorb", not "how does it behave with N users
+# online at once".
+
+target:
+  rpc_url: "http://127.0.0.1:8545"
+  chain_id: 31337
+  environment: local
+
+scenario:
+  name: arrival_rate_test
+
+load:
+  type: arrival-rate
+  rate: 50
+  time_unit: 1s
+  max_vus: 300
+  duration: 2m
+
+wallets:
+  count: 300
+
+variables:
+  recipient: "0x000000000000000000000000000000000000dEaD"
+
+steps:
+  - action: transfer
+    to: ${recipient}
+    amount: "1000000000000000"
+    wait_for_confirmation: true
+
+assertions:
+  - transaction_success_rate > 95%
+  - rpc_p95 < 500ms
+
+safety:
+  allowed_chain_ids: [31337]

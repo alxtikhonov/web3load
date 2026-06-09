@@ -98,10 +98,23 @@ func (l Load) validate() error {
 			return fmt.Errorf("load.stage_duration must be > 0 for stress load")
 		}
 		return validateStages(l)
+	case "arrival-rate":
+		if l.Rate <= 0 {
+			return fmt.Errorf("load.rate must be > 0 for arrival-rate load")
+		}
+		if l.MaxVUs <= 0 {
+			return fmt.Errorf("load.max_vus must be > 0 for arrival-rate load")
+		}
+		if l.PreAllocatedVUs < 0 || l.PreAllocatedVUs > l.MaxVUs {
+			return fmt.Errorf("load.pre_allocated_vus must be between 0 and load.max_vus")
+		}
+		if l.Duration.AsTime() <= 0 {
+			return fmt.Errorf("load.duration must be > 0 for arrival-rate load")
+		}
 	case "":
-		return fmt.Errorf("load.type is required (constant|ramping|spike|stress|soak)")
+		return fmt.Errorf("load.type is required (constant|ramping|spike|stress|soak|arrival-rate)")
 	default:
-		return fmt.Errorf("load.type %q is not supported in v0.1 (arrival-rate is a roadmap item)", l.Type)
+		return fmt.Errorf("load.type %q is not a supported load type", l.Type)
 	}
 	return nil
 }

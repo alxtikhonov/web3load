@@ -4,7 +4,9 @@
 // share one execution path (a fixed VU count held for a duration); ramping,
 // spike, and stress share another (a sequence of stages) — spike/stress are
 // expanded into stages by scenario.Load.ResolvedStages before they ever
-// reach this package, so there are only two schedulers here, not five.
+// reach this package. arrival-rate is the one genuinely different
+// scheduler: it controls the rate new iterations start, not how many run
+// concurrently, so it can't be expressed as either of the other two.
 package load
 
 import (
@@ -53,6 +55,8 @@ func (e *Engine) Run(ctx context.Context) error {
 			return err
 		}
 		return e.runRamping(ctx, stages)
+	case "arrival-rate":
+		return e.runArrivalRate(ctx)
 	default:
 		return fmt.Errorf("load: unsupported load type %q", loadType)
 	}
@@ -130,6 +134,65 @@ func (e *Engine) runRamping(ctx context.Context, stages []scenario.Stage) error 
 	stopAll()
 	wg.Wait()
 	return nil
+}
+
+// runArrivalRate starts Rate new iterations per TimeUnit, each running on
+// its own goroutine, capped at MaxVUs concurrently in flight via a
+// semaphore. Unlike the VU-count models above, an iteration here runs
+// exactly once and exits — the "rate" is a property of how often new
+// iterations start, decoupled from how long each one takes. If iterations
+// are taking longer than the arrival interval and MaxVUs is already
+// saturated, the tick is dropped rather than queued or blocked: a load
+// generator that fell behind schedule and silently caught up later would
+// misrepresent the rate it actually achieved.
+func (e *Engine) runArrivalRate(ctx context.Context) error {
+	l := e.Scenario.Load
+	unit := l.TimeUnit.AsTime()
+	if unit <= 0 {
+		unit = time.Second
+	}
+	interval := unit / time.Duration(l.Rate)
+	if interval <= 0 {
+		interval = time.Millisecond
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, l.Duration.AsTime())
+	defer cancel()
+
+	sem := make(chan struct{}, l.MaxVUs)
+	var wg sync.WaitGroup
+	var dropped int64
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			wg.Wait()
+			if dropped > 0 {
+				slog.Warn("load: arrival-rate finished with dropped iterations", "dropped", dropped, "max_vus", l.MaxVUs)
+			}
+			if err := ctx.Err(); err != nil && err != context.DeadlineExceeded {
+				return err
+			}
+			return nil
+		case <-ticker.C:
+			select {
+			case sem <- struct{}{}:
+				wg.Add(1)
+				w := e.nextWallet()
+				go func() {
+					defer wg.Done()
+					defer func() { <-sem }()
+					e.runIteration(ctx, w)
+				}()
+			default:
+				dropped++
+				slog.Warn("load: arrival-rate dropped an iteration, max_vus exhausted", "max_vus", l.MaxVUs)
+			}
+		}
+	}
 }
 
 func (e *Engine) nextWallet() wallet.Wallet {

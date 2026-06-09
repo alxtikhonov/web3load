@@ -51,7 +51,7 @@ type Target struct {
 }
 
 type Load struct {
-	Type     string   `yaml:"type"` // constant | ramping | spike | stress | soak
+	Type     string   `yaml:"type"` // constant | ramping | spike | stress | soak | arrival-rate
 	VUs      int      `yaml:"vus"`
 	Duration Duration `yaml:"duration"`
 	Stages   []Stage  `yaml:"stages"`
@@ -70,6 +70,17 @@ type Load struct {
 	Step          int      `yaml:"step"`
 	StageDuration Duration `yaml:"stage_duration"`
 	Max           int      `yaml:"max"`
+
+	// arrival-rate: start Rate new iterations per TimeUnit (default 1s),
+	// each run by a worker goroutine spawned on demand up to MaxVUs
+	// concurrent. PreAllocatedVUs is accepted for schema compatibility with
+	// other tools but isn't used to pre-warm a pool in v0.2 — see
+	// docs/dsl-reference.md for why that's a deliberate, documented gap
+	// rather than an oversight.
+	Rate            int      `yaml:"rate"`
+	TimeUnit        Duration `yaml:"time_unit"`
+	PreAllocatedVUs int      `yaml:"pre_allocated_vus"`
+	MaxVUs          int      `yaml:"max_vus"`
 }
 
 // ResolvedStages expands spike/stress into an explicit []Stage sequence so
