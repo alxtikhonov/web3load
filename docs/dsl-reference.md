@@ -45,13 +45,13 @@ being silently accepted anywhere in a scenario.
 
 ## Load models
 
-`constant`, `ramping`, `spike`, `stress`, and `soak` ship. `arrival-rate`
-remains a roadmap item — it needs a genuinely different scheduler (rate of
-new iterations, decoupled from concurrent VU count), whereas the other five
-are all parameterizations of one of two primitives the load engine actually
-runs: a fixed VU count held for a duration, or a sequence of `{duration,
-target}` stages. `spike` and `stress` are expanded into stages by
-`scenario.Load.ResolvedStages` before the engine ever sees them.
+All six ship: `constant`, `ramping`, `spike`, `stress`, `soak`, and
+`arrival-rate`. The first five are all parameterizations of one of two
+primitives the load engine actually runs: a fixed VU count held for a
+duration, or a sequence of `{duration, target}` stages (`spike` and
+`stress` are expanded into stages by `scenario.Load.ResolvedStages` before
+the engine ever sees them). `arrival-rate` is the one genuinely different
+scheduler — see below.
 
 ```yaml
 load:
@@ -108,10 +108,40 @@ load:
   duration: 4h
 ```
 
+`arrival-rate`: start `rate` new iterations per `time_unit`, independent of
+how long each one takes, using up to `max_vus` concurrent workers spawned
+on demand (examples/arrival_rate_test.yaml). This is the right model when
+what you're testing is "how many new sessions per second can this endpoint
+absorb", which `constant`/`ramping` can't express directly — a slow
+downstream RPC call there just means fewer completed iterations per VU,
+silently reducing your actual arrival rate instead of holding it steady.
+
+```yaml
+load:
+  type: arrival-rate
+  rate: 50
+  time_unit: 1s     # default 1s if omitted
+  max_vus: 300      # hard concurrency cap
+  duration: 2m
+```
+
+If iterations are taking longer than the arrival interval and `max_vus` is
+already saturated, that tick is **dropped**, not queued — a generator that
+silently fell behind and caught up later would misrepresent the rate it
+actually achieved, which defeats the point of this load model. Dropped
+iterations are logged (`load: arrival-rate dropped an iteration`); size
+`max_vus` generously if you don't want to see them. `pre_allocated_vus` is
+accepted in the schema for compatibility with the concept as it appears in
+other tools, but v0.2 doesn't pre-warm a worker pool with it — Go's
+goroutine spawn cost is low enough that this matters far less here than in
+runtimes where it originated; documented as a real gap, not silently
+ignored.
+
 Each virtual user is assigned a wallet round-robin from the keystore and
-repeats `steps` in a loop for as long as it's kept alive. `wallets.count`
-should generally be >= the peak concurrent VU target so no two concurrently
-active VUs ever share a wallet's in-flight nonce.
+repeats `steps` in a loop for as long as it's kept alive (`arrival-rate`
+iterations run once, not in a loop). `wallets.count` should generally be >=
+the peak concurrent VU target (or `max_vus`, for arrival-rate) so no two
+concurrently active VUs ever share a wallet's in-flight nonce.
 
 ## Variable substitution
 

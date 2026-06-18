@@ -22,9 +22,33 @@ func TestValidate_AcceptsValidScenario(t *testing.T) {
 
 func TestValidate_RejectsUnsupportedLoadType(t *testing.T) {
 	s := validScenario()
-	s.Load.Type = "arrival-rate"
+	s.Load.Type = "sine-wave" // not a real load type
 	if err := s.Validate(); err == nil {
-		t.Fatal("expected arrival-rate load type to be rejected in v0.1")
+		t.Fatal("expected an unrecognized load type to be rejected")
+	}
+}
+
+func TestValidate_AcceptsArrivalRateLoad(t *testing.T) {
+	s := validScenario()
+	s.Load = Load{Type: "arrival-rate", Rate: 100, TimeUnit: Duration(1), MaxVUs: 200, Duration: Duration(1)}
+	if err := s.Validate(); err != nil {
+		t.Fatalf("expected valid arrival-rate load to pass, got: %v", err)
+	}
+}
+
+func TestValidate_RejectsArrivalRatePreAllocatedAboveMax(t *testing.T) {
+	s := validScenario()
+	s.Load = Load{Type: "arrival-rate", Rate: 100, MaxVUs: 10, PreAllocatedVUs: 20, Duration: Duration(1)}
+	if err := s.Validate(); err == nil {
+		t.Fatal("expected pre_allocated_vus > max_vus to be rejected")
+	}
+}
+
+func TestValidate_RejectsArrivalRateWithoutRate(t *testing.T) {
+	s := validScenario()
+	s.Load = Load{Type: "arrival-rate", MaxVUs: 10, Duration: Duration(1)}
+	if err := s.Validate(); err == nil {
+		t.Fatal("expected arrival-rate load without load.rate to be rejected")
 	}
 }
 
