@@ -22,7 +22,7 @@ import (
 )
 
 func newRunCmd() *cobra.Command {
-	var walletsPath, out, metricsAddr, otelEndpoint, password string
+	var walletsPath, out, htmlOut, metricsAddr, otelEndpoint, password string
 	var dryRun bool
 	var progressInterval time.Duration
 	c := &cobra.Command{
@@ -121,11 +121,18 @@ func newRunCmd() *cobra.Command {
 					return err
 				}
 			}
-			return checkAssertions(cmd, s.Asserts, result)
+			assertionResults, aerr := checkAssertions(cmd, s.Asserts, result)
+			if htmlOut != "" {
+				if err := report.WriteHTML(htmlOut, result, assertionResults); err != nil {
+					return err
+				}
+			}
+			return aerr
 		},
 	}
 	c.Flags().StringVar(&walletsPath, "wallets", "wallets.json", "keystore file to run the scenario against")
 	c.Flags().StringVar(&out, "out", "", "write JSON results to this path")
+	c.Flags().StringVar(&htmlOut, "html", "", "write a self-contained HTML report to this path")
 	c.Flags().StringVar(&metricsAddr, "metrics-addr", "", "expose Prometheus metrics at this address (e.g. :9090) while running")
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "estimate gas without broadcasting (partial in v0.1, see docs/security.md)")
 	c.Flags().StringVar(&otelEndpoint, "otel-endpoint", "", "OTLP/HTTP collector host:port to send trace spans to (e.g. localhost:4318); unset disables tracing")
@@ -186,13 +193,16 @@ func containsChainID(ids []int64, id int64) bool {
 	return false
 }
 
-func checkAssertions(cmd *cobra.Command, exprs []string, result report.Result) error {
+// checkAssertions prints PASS/FAIL for each assertion and returns them
+// alongside the pass/fail error, so callers can also feed them into
+// report.WriteHTML without re-evaluating.
+func checkAssertions(cmd *cobra.Command, exprs []string, result report.Result) ([]report.AssertionResult, error) {
 	if len(exprs) == 0 {
-		return nil
+		return nil, nil
 	}
 	results, err := report.EvaluateAssertions(exprs, result)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fmt.Fprintln(cmd.OutOrStdout())
 	var failed int
@@ -205,7 +215,7 @@ func checkAssertions(cmd *cobra.Command, exprs []string, result report.Result) e
 		fmt.Fprintf(cmd.OutOrStdout(), "[%s] %s\n", status, a.Expr)
 	}
 	if failed > 0 {
-		return fmt.Errorf("%d/%d assertions failed", failed, len(results))
+		return results, fmt.Errorf("%d/%d assertions failed", failed, len(results))
 	}
-	return nil
+	return results, nil
 }

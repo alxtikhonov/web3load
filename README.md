@@ -101,7 +101,7 @@ can be driven from a scenario without a core code change. `approve` and
 - EVM chain adapter (works against any EVM-compatible RPC, tested on Anvil)
 - Nonce management safe under concurrent virtual users, with automatic resync on a nonce mismatch
 - Plaintext or encrypted (scrypt + AES-256-GCM) keystores
-- Console + JSON reports, scenario assertions with pass/fail exit code
+- Console, JSON, and self-contained HTML reports (`--html`), scenario assertions with pass/fail exit code
 - Structured logs (`--log-level`, `--log-format`) and periodic progress snapshots (`--progress-interval`) — see [docs/observability.md](docs/observability.md)
 - Prometheus `/metrics` endpoint with an auto-provisioned Grafana dashboard ([deploy/grafana](deploy/grafana)), and OpenTelemetry trace export (`--otel-endpoint`)
 
