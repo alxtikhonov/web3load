@@ -37,12 +37,19 @@
 
 - `safety.max_spend_per_wallet_native` bounds any single native-currency
   transfer; `transfer` rejects amounts above it before signing.
-- `safety.max_gas_price_gwei` is intended to bound `SuggestFees` (full
-  enforcement — clamping rather than just rejecting — is a v0.2 item;
-  tracked so it doesn't get lost).
+- `safety.max_gas_price_gwei` clamps the fee cap `txengine` signs with
+  (`Engine.MaxGasPriceGwei`) — not just the tip, and not a rejection: a
+  scenario that would otherwise send at whatever the network suggests gets
+  capped instead, and a warning is logged each time clamping actually
+  changes anything. The tip cap is clamped down with it whenever it would
+  otherwise exceed the (now-lower) fee cap, since a tip above the fee cap
+  is an invalid EIP-1559 transaction — clamping only one of the two could
+  turn "too expensive" into "the RPC rejects this outright."
 - `web3load validate` never broadcasts anything — it only parses and checks
-  the schema. `run --dry-run` executes the full scenario logic but skips
-  `eth_sendRawTransaction` (gas estimation and validation still happen).
+  the schema. `run --dry-run` builds, estimates gas for, and signs every
+  transaction exactly like a real run, but stops before
+  `eth_sendRawTransaction`; the nonce it allocated is released immediately
+  since nothing was actually consumed on-chain.
 
 ## Rate limiting
 

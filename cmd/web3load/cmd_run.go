@@ -64,7 +64,7 @@ func newRunCmd() *cobra.Command {
 			}
 
 			if dryRun {
-				fmt.Fprintln(cmd.OutOrStdout(), "dry-run: v0.1 dry-run validates and estimates gas only; use 'web3load validate' beforehand for schema checks. Full broadcast-skipping enforcement is a v0.2 item (see docs/security.md).")
+				fmt.Fprintln(cmd.OutOrStdout(), "dry-run: building, estimating gas, and signing every transaction, but never broadcasting (no eth_sendRawTransaction) — see docs/security.md.")
 			}
 
 			if otelEndpoint != "" {
@@ -84,6 +84,8 @@ func newRunCmd() *cobra.Command {
 
 			nonces := wallet.NewNonceManager(adapter)
 			engine := txengine.New(adapter, nonces)
+			engine.MaxGasPriceGwei = s.Safety.MaxGasPriceGwei
+			engine.DryRun = dryRun
 			deps := action.Deps{Adapter: adapter, Engine: engine, Safety: s.Safety}
 
 			collector := metrics.New()
@@ -134,7 +136,7 @@ func newRunCmd() *cobra.Command {
 	c.Flags().StringVar(&out, "out", "", "write JSON results to this path")
 	c.Flags().StringVar(&htmlOut, "html", "", "write a self-contained HTML report to this path")
 	c.Flags().StringVar(&metricsAddr, "metrics-addr", "", "expose Prometheus metrics at this address (e.g. :9090) while running")
-	c.Flags().BoolVar(&dryRun, "dry-run", false, "estimate gas without broadcasting (partial in v0.1, see docs/security.md)")
+	c.Flags().BoolVar(&dryRun, "dry-run", false, "build, estimate gas, and sign, but never broadcast any transaction")
 	c.Flags().StringVar(&otelEndpoint, "otel-endpoint", "", "OTLP/HTTP collector host:port to send trace spans to (e.g. localhost:4318); unset disables tracing")
 	c.Flags().DurationVar(&progressInterval, "progress-interval", 30*time.Second, "how often to log a progress snapshot; 0 disables it (useful for soak tests)")
 	c.Flags().StringVar(&password, "password", "", "password for an encrypted keystore (or set "+keystorePasswordEnvVar+")")

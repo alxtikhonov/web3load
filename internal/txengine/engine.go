@@ -33,6 +33,18 @@ type Engine struct {
 	Nonces         *wallet.NonceManager
 	ConfirmTimeout time.Duration
 	PollInterval   time.Duration
+
+	// MaxGasPriceGwei, if > 0, clamps the fee cap (and tip cap, so it never
+	// exceeds the clamped fee cap) suggested by the adapter before signing.
+	// Corresponds to scenario safety.max_gas_price_gwei — see
+	// docs/security.md.
+	MaxGasPriceGwei float64
+
+	// DryRun builds and signs every transaction exactly as a real run
+	// would (so gas estimation and signing are still exercised) but stops
+	// short of SendRawTransaction. The allocated nonce is released
+	// immediately since nothing was actually consumed on-chain.
+	DryRun bool
 }
 
 func New(adapter chain.Adapter, nonces *wallet.NonceManager) *Engine {
@@ -60,6 +72,9 @@ func (e *Engine) Send(ctx context.Context, from wallet.Wallet, to *common.Addres
 		e.Nonces.Release(fromAddr, nonce)
 		return Outcome{}, fmt.Errorf("txengine: suggest fees: %w", err)
 	}
+	if e.MaxGasPriceGwei > 0 {
+		tipCap, feeCap = clampGasPrice(tipCap, feeCap, e.MaxGasPriceGwei, fromAddr)
+	}
 
 	req := chain.TxRequest{From: fromAddr, To: to, Value: value, Data: data, Nonce: nonce, GasLimit: gasLimit}
 	if req.GasLimit == 0 {
@@ -75,6 +90,11 @@ func (e *Engine) Send(ctx context.Context, from wallet.Wallet, to *common.Addres
 	if err != nil {
 		e.Nonces.Release(fromAddr, nonce)
 		return Outcome{}, fmt.Errorf("txengine: sign: %w", err)
+	}
+
+	if e.DryRun {
+		e.Nonces.Release(fromAddr, nonce)
+		return Outcome{Success: true}, nil
 	}
 
 	submitStart := time.Now()
@@ -105,6 +125,30 @@ func (e *Engine) Send(ctx context.Context, from wallet.Wallet, to *common.Addres
 func isNonceError(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "nonce too low") || strings.Contains(msg, "nonce too high")
+}
+
+// clampGasPrice caps feeCap at maxGasPriceGwei, and tipCap at whatever
+// feeCap ends up being — a tip above the fee cap is an invalid EIP-1559
+// transaction, so clamping only the fee cap and leaving tip alone could
+// turn a "too expensive" scenario into a "the RPC rejects this tx outright"
+// one, which is a worse failure mode than the cap it was meant to enforce.
+func clampGasPrice(tipCap, feeCap *big.Int, maxGasPriceGwei float64, wallet common.Address) (*big.Int, *big.Int) {
+	maxWei := gweiToWei(maxGasPriceGwei)
+	if feeCap.Cmp(maxWei) <= 0 {
+		return tipCap, feeCap
+	}
+	slog.Warn("txengine: clamping gas price to safety.max_gas_price_gwei",
+		"wallet", wallet.Hex(), "suggested_fee_cap_wei", feeCap.String(), "max_gwei", maxGasPriceGwei)
+	feeCap = maxWei
+	if tipCap.Cmp(feeCap) > 0 {
+		tipCap = new(big.Int).Set(feeCap)
+	}
+	return tipCap, feeCap
+}
+
+func gweiToWei(gwei float64) *big.Int {
+	wei, _ := new(big.Float).Mul(big.NewFloat(gwei), big.NewFloat(1e9)).Int(nil)
+	return wei
 }
 
 func (e *Engine) waitForConfirmation(ctx context.Context, out Outcome) (Outcome, error) {
