@@ -1,5 +1,6 @@
 // Command web3load is the CLI entrypoint: validate, run, wallets
-// generate/fund, and report.
+// generate/fund, report, and the controller/worker distributed mode
+// commands.
 package main
 
 import (
@@ -27,6 +28,8 @@ func main() {
 	root.AddCommand(newRunCmd())
 	root.AddCommand(newWalletsCmd())
 	root.AddCommand(newReportCmd())
+	root.AddCommand(newControllerCmd())
+	root.AddCommand(newWorkerCmd())
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)

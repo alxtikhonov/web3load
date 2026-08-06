@@ -51,6 +51,13 @@
   `eth_sendRawTransaction`; the nonce it allocated is released immediately
   since nothing was actually consumed on-chain.
 
+## Distributed mode
+
+Controller/worker coordination has no transport encryption or
+authentication in v0.3, and `Assignment` responses carry wallet private
+keys over that channel. See [docs/distributed.md](distributed.md#security-no-transport-encryption-or-auth) —
+run it only on a trusted network.
+
 ## Rate limiting
 
 `internal/rpc` is the intended home for a token-bucket limiter around the

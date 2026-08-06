@@ -26,6 +26,15 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// MarshalYAML emits Duration as time.Duration's own string form (e.g.
+// "2m0s"), which UnmarshalYAML above can always parse back — this is what
+// makes a Scenario round-trip through YAML safely, which the distributed
+// controller relies on to ship a scenario to a worker as text rather than
+// requiring a shared filesystem.
+func (d Duration) MarshalYAML() (interface{}, error) {
+	return time.Duration(d).String(), nil
+}
+
 func (d Duration) AsTime() time.Duration { return time.Duration(d) }
 
 type Scenario struct {
@@ -106,6 +115,54 @@ func (l Load) ResolvedStages() ([]Stage, error) {
 		return stages, nil
 	default:
 		return nil, fmt.Errorf("load type %q is not stage-based", l.Type)
+	}
+}
+
+// Shard returns the portion of l assigned to worker shardIndex out of
+// shardCount total workers in distributed mode, dividing VU/rate targets
+// as evenly as possible — any remainder goes to the earliest-indexed
+// shards, so per-worker targets always sum back to the original. Stage-
+// based types (ramping/spike/stress) are first resolved via
+// ResolvedStages, then each stage's target is divided; the returned Load
+// is always type "ramping" in that case, since the sharded stage list no
+// longer matches the original spike/stress parameters.
+func (l Load) Shard(shardIndex, shardCount int) (Load, error) {
+	if shardCount <= 1 {
+		return l, nil
+	}
+	divide := func(total int) int {
+		base := total / shardCount
+		if shardIndex < total%shardCount {
+			base++
+		}
+		return base
+	}
+
+	switch l.Type {
+	case "constant", "soak":
+		out := l
+		out.VUs = divide(l.VUs)
+		return out, nil
+	case "arrival-rate":
+		out := l
+		out.Rate = divide(l.Rate)
+		out.MaxVUs = divide(l.MaxVUs)
+		if out.PreAllocatedVUs > out.MaxVUs {
+			out.PreAllocatedVUs = out.MaxVUs
+		}
+		return out, nil
+	case "ramping", "spike", "stress":
+		stages, err := l.ResolvedStages()
+		if err != nil {
+			return Load{}, err
+		}
+		sharded := make([]Stage, len(stages))
+		for i, st := range stages {
+			sharded[i] = Stage{Duration: st.Duration, Target: divide(st.Target)}
+		}
+		return Load{Type: "ramping", Stages: sharded}, nil
+	default:
+		return Load{}, fmt.Errorf("load type %q cannot be sharded across workers", l.Type)
 	}
 }
 

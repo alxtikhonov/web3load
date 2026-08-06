@@ -5,7 +5,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/alxtikhonov/web3load.svg)](https://pkg.go.dev/github.com/alxtikhonov/web3load)
 ![Go version](https://img.shields.io/github/go-mod/go-version/alxtikhonov/web3load)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Status](https://img.shields.io/badge/status-v0.2-blue)
+![Status](https://img.shields.io/badge/status-v0.3%20in%20progress-orange)
 
 **Load testing for blockchain infrastructure — the way k6 does it for APIs.**
 
@@ -29,11 +29,13 @@ See [docs/architecture](docs/) for the full design rationale.
 
 ## Status
 
-**v0.2** — EVM only, single-process, tested against
+**v0.3 in progress** — EVM only, tested against
 [Anvil](https://book.getfoundry.sh/anvil/). All six load models
 (constant/ramping/spike/stress/soak/arrival-rate), encrypted keystores,
-structured logs, OpenTelemetry tracing, and a Grafana dashboard. See the
-roadmap below for what's next (v0.3: distributed mode, plugins, Solana).
+structured logs, OpenTelemetry tracing, a Grafana dashboard, HTML reports,
+fully-enforced dry-run/gas-price safety limits, and distributed mode
+(controller/worker across multiple processes — [docs/distributed.md](docs/distributed.md)).
+Still open in v0.3: a plugin system and an experimental Solana adapter.
 
 ## Quickstart
 
@@ -60,6 +62,20 @@ go run ./cmd/web3load report results.json
 
 `--from` above is Anvil's well-known default account #0 — never use it, or
 any key committed to a repo, on a network holding real funds.
+
+### Distributed across multiple processes
+
+```bash
+web3load controller run scenario.yaml --wallets wallets.json --workers 3 --listen :7700
+# on each worker:
+web3load worker --controller http://<controller-host>:7700
+```
+
+Each worker gets a disjoint slice of the wallets and a proportionally
+scaled-down load target, runs the same engine `run` does, and streams
+progress back for the controller to aggregate. See
+[docs/distributed.md](docs/distributed.md) — including why this is
+HTTP/JSON rather than gRPC, and why it needs a trusted network.
 
 ## Declarative scenarios
 
@@ -96,17 +112,18 @@ can be driven from a scenario without a core code change. `approve` and
 ## What's in
 
 - `web3load validate` / `run` / `wallets generate` / `wallets fund` / `report`
+- `web3load controller run` / `worker` — shard a scenario and its wallets across N processes; see [docs/distributed.md](docs/distributed.md)
 - Load models: `constant`, `ramping`, `spike`, `stress`, `soak`, `arrival-rate` — see [docs/dsl-reference.md](docs/dsl-reference.md#load-models)
 - Actions: `get_balance`, `transfer`, `erc20_transfer`, `approve`, `contract_call`, each retryable via a per-step `retry` policy that's safe against double-broadcast
 - EVM chain adapter (works against any EVM-compatible RPC, tested on Anvil)
 - Nonce management safe under concurrent virtual users, with automatic resync on a nonce mismatch
 - Plaintext or encrypted (scrypt + AES-256-GCM) keystores
+- `--dry-run` that never broadcasts, and `safety.max_gas_price_gwei` that clamps the fee cap rather than just rejecting
 - Console, JSON, and self-contained HTML reports (`--html`), scenario assertions with pass/fail exit code
 - Structured logs (`--log-level`, `--log-format`) and periodic progress snapshots (`--progress-interval`) — see [docs/observability.md](docs/observability.md)
 - Prometheus `/metrics` endpoint with an auto-provisioned Grafana dashboard ([deploy/grafana](deploy/grafana)), and OpenTelemetry trace export (`--otel-endpoint`)
 
-Not yet: distributed load generation, dynamic plugins, non-EVM chains. See
-the roadmap.
+Not yet: dynamic plugins, non-EVM chains. See the roadmap.
 
 ## Roadmap
 
@@ -114,7 +131,7 @@ the roadmap.
 |---|---|
 | v0.1 | MVP: constant/ramping load, EVM, wallet+nonce management, core actions |
 | v0.2 | ✅ all six load models, encrypted keystores, retry policies, structured logs, OpenTelemetry tracing, Grafana dashboard |
-| v0.3 | Distributed mode (controller/worker), plugin system, experimental Solana adapter |
+| v0.3 | ✅ HTML reports, full dry-run/gas-price enforcement, distributed mode · ⏳ plugin system, experimental Solana adapter |
 | v1.0 | Stable DSL/schema, Solana GA, adapter conformance suite, docs site |
 
 ## Security
