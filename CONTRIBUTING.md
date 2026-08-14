@@ -21,7 +21,11 @@ stake, ...). You do **not** need to touch the core engine:
 
 If your operation doesn't need a bespoke Go type at all, prefer documenting
 it as a `contract_call` example instead — that's the generic path and keeps
-the action registry small.
+the action registry small. If it needs custom logic but not a Go build of
+Web3Load itself (a separate team's protocol quirk, something better
+maintained outside this repo, something not written in Go at all), write
+it as a **plugin** instead — see [docs/plugins.md](docs/plugins.md); no
+core change, no PR to this repo required at all.
 
 ## Adding a new chain
 

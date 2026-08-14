@@ -13,6 +13,22 @@ func validScenario() Scenario {
 	}
 }
 
+func TestValidate_AcceptsPluginAction(t *testing.T) {
+	s := validScenario()
+	s.Steps = []Step{{Action: "plugin:deadline", Args: []interface{}{300}}}
+	if err := s.Validate(); err != nil {
+		t.Fatalf("expected a plugin: action to pass validation without being registered, got: %v", err)
+	}
+}
+
+func TestValidate_RejectsEmptyPluginActionName(t *testing.T) {
+	s := validScenario()
+	s.Steps = []Step{{Action: "plugin:"}}
+	if err := s.Validate(); err == nil {
+		t.Fatal("expected an empty plugin action name to be rejected")
+	}
+}
+
 func TestValidate_AcceptsValidScenario(t *testing.T) {
 	s := validScenario()
 	if err := s.Validate(); err != nil {

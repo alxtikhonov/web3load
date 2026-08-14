@@ -25,6 +25,7 @@ func newRunCmd() *cobra.Command {
 	var walletsPath, out, htmlOut, metricsAddr, otelEndpoint, password string
 	var dryRun bool
 	var progressInterval time.Duration
+	var pluginSpecs []string
 	c := &cobra.Command{
 		Use:   "run <scenario.yaml>",
 		Short: "Execute a scenario against a live EVM RPC endpoint",
@@ -39,6 +40,12 @@ func newRunCmd() *cobra.Command {
 				if err := confirmProduction(cmd, s.Info.Name); err != nil {
 					return err
 				}
+			}
+
+			plugins, err := loadPlugins(pluginSpecs)
+			defer closePlugins(plugins)
+			if err != nil {
+				return err
 			}
 
 			ks, err := wallet.LoadAny(walletsPath, resolvePassword(password))
@@ -140,6 +147,7 @@ func newRunCmd() *cobra.Command {
 	c.Flags().StringVar(&otelEndpoint, "otel-endpoint", "", "OTLP/HTTP collector host:port to send trace spans to (e.g. localhost:4318); unset disables tracing")
 	c.Flags().DurationVar(&progressInterval, "progress-interval", 30*time.Second, "how often to log a progress snapshot; 0 disables it (useful for soak tests)")
 	c.Flags().StringVar(&password, "password", "", "password for an encrypted keystore (or set "+keystorePasswordEnvVar+")")
+	c.Flags().StringArrayVar(&pluginSpecs, "plugin", nil, "load a plugin subprocess as an action, name=path (repeatable) — see docs/plugins.md")
 	return c
 }
 

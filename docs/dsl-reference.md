@@ -155,8 +155,11 @@ An unresolved `${...}` is left verbatim (so a typo fails loudly downstream
 rather than silently sending to the zero address).
 
 Relative-time expressions like `${now + 300}` (useful for swap deadlines)
-are **not** supported in v0.1 — use a literal future unix timestamp. This is
-a documented roadmap gap, not an oversight.
+are **not** supported directly — use a literal future unix timestamp, or
+compute one via the `examples/plugins/deadline` example plugin
+(`action: plugin:deadline`, see [docs/plugins.md](plugins.md)), which
+exists specifically to fill this gap through the extension mechanism
+instead of a core change.
 
 ## Steps
 

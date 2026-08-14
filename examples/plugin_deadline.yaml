@@ -1,0 +1,36 @@
+version: "0.1"
+
+# Demonstrates the plugin mechanism via the example "deadline" plugin
+# (examples/plugins/deadline), which fills the one documented DSL gap —
+# relative-time expressions like `${now + 300}` aren't supported directly
+# in scenario YAML — using the extension mechanism instead of a core
+# change. Build the plugin first:
+#   go build -o deadline ./examples/plugins/deadline
+# Then:
+#   web3load run examples/plugin_deadline.yaml --plugin deadline=./deadline
+
+target:
+  rpc_url: "http://127.0.0.1:8545"
+  chain_id: 31337
+  environment: local
+
+scenario:
+  name: plugin_deadline_demo
+
+load:
+  type: constant
+  vus: 1
+  duration: 5s
+
+wallets:
+  count: 1
+
+steps:
+  - action: plugin:deadline
+    args: [300]
+    save_as: swap_deadline
+
+  - action: get_balance
+
+assertions:
+  - transaction_success_rate > 99%

@@ -1,6 +1,18 @@
 package scenario
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
+
+// pluginActionPrefix marks a step action as resolved by an externally
+// loaded plugin subprocess rather than the built-in registry — see
+// docs/plugins.md. Validation can't know in advance which plugin names a
+// given `run` invocation will actually load (that's a CLI flag, not part
+// of the scenario), so it only checks the name is well-formed; an
+// unregistered plugin action fails at run time instead, the same way an
+// unregistered built-in name would.
+const pluginActionPrefix = "plugin:"
 
 // builtinActions is the v0.1 allow-list. New actions registered in
 // internal/action must be added here too, or scenarios referencing them
@@ -145,7 +157,11 @@ func (step Step) validate(i int) error {
 		}
 		return nil
 	}
-	if !builtinActions[step.Action] {
+	if strings.HasPrefix(step.Action, pluginActionPrefix) {
+		if step.Action == pluginActionPrefix {
+			return fmt.Errorf("steps[%d]: plugin action name must not be empty (\"plugin:<name>\")", i)
+		}
+	} else if !builtinActions[step.Action] {
 		return fmt.Errorf("steps[%d]: unknown action %q", i, step.Action)
 	}
 	if step.Action == "contract_call" && (step.Contract == "" || step.Method == "" || step.ABIFile == "") {

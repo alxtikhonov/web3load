@@ -33,9 +33,10 @@ See [docs/architecture](docs/) for the full design rationale.
 [Anvil](https://book.getfoundry.sh/anvil/). All six load models
 (constant/ramping/spike/stress/soak/arrival-rate), encrypted keystores,
 structured logs, OpenTelemetry tracing, a Grafana dashboard, HTML reports,
-fully-enforced dry-run/gas-price safety limits, and distributed mode
-(controller/worker across multiple processes — [docs/distributed.md](docs/distributed.md)).
-Still open in v0.3: a plugin system and an experimental Solana adapter.
+fully-enforced dry-run/gas-price safety limits, distributed mode
+(controller/worker across multiple processes — [docs/distributed.md](docs/distributed.md)),
+and a subprocess plugin system ([docs/plugins.md](docs/plugins.md)).
+Still open: an experimental Solana adapter.
 
 ## Quickstart
 
@@ -76,6 +77,18 @@ scaled-down load target, runs the same engine `run` does, and streams
 progress back for the controller to aggregate. See
 [docs/distributed.md](docs/distributed.md) — including why this is
 HTTP/JSON rather than gRPC, and why it needs a trusted network.
+
+### Plugins
+
+```bash
+go build -o deadline ./examples/plugins/deadline
+web3load run examples/plugin_deadline.yaml --plugin deadline=./deadline
+```
+
+A plugin is a subprocess speaking one line of JSON in, one line of JSON
+out — any language, no SDK. It returns either a transaction spec (the host
+builds, signs, and submits it — a plugin never sees a private key) or a
+plain result. See [docs/plugins.md](docs/plugins.md).
 
 ## Declarative scenarios
 
@@ -122,8 +135,9 @@ can be driven from a scenario without a core code change. `approve` and
 - Console, JSON, and self-contained HTML reports (`--html`), scenario assertions with pass/fail exit code
 - Structured logs (`--log-level`, `--log-format`) and periodic progress snapshots (`--progress-interval`) — see [docs/observability.md](docs/observability.md)
 - Prometheus `/metrics` endpoint with an auto-provisioned Grafana dashboard ([deploy/grafana](deploy/grafana)), and OpenTelemetry trace export (`--otel-endpoint`)
+- Subprocess plugins (`--plugin name=path`) for custom step logic beyond what `contract_call` expresses — see [docs/plugins.md](docs/plugins.md)
 
-Not yet: dynamic plugins, non-EVM chains. See the roadmap.
+Not yet: non-EVM chains. See the roadmap.
 
 ## Roadmap
 
@@ -131,7 +145,7 @@ Not yet: dynamic plugins, non-EVM chains. See the roadmap.
 |---|---|
 | v0.1 | MVP: constant/ramping load, EVM, wallet+nonce management, core actions |
 | v0.2 | ✅ all six load models, encrypted keystores, retry policies, structured logs, OpenTelemetry tracing, Grafana dashboard |
-| v0.3 | ✅ HTML reports, full dry-run/gas-price enforcement, distributed mode · ⏳ plugin system, experimental Solana adapter |
+| v0.3 | ✅ HTML reports, full dry-run/gas-price enforcement, distributed mode, plugin system · ⏳ experimental Solana adapter |
 | v1.0 | Stable DSL/schema, Solana GA, adapter conformance suite, docs site |
 
 ## Security
