@@ -5,7 +5,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/alxtikhonov/web3load.svg)](https://pkg.go.dev/github.com/alxtikhonov/web3load)
 ![Go version](https://img.shields.io/github/go-mod/go-version/alxtikhonov/web3load)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Status](https://img.shields.io/badge/status-v0.3%20in%20progress-orange)
+![Status](https://img.shields.io/badge/status-v0.3-blue)
 
 **Load testing for blockchain infrastructure — the way k6 does it for APIs.**
 
@@ -29,14 +29,15 @@ See [docs/architecture](docs/) for the full design rationale.
 
 ## Status
 
-**v0.3 in progress** — EVM only, tested against
-[Anvil](https://book.getfoundry.sh/anvil/). All six load models
-(constant/ramping/spike/stress/soak/arrival-rate), encrypted keystores,
-structured logs, OpenTelemetry tracing, a Grafana dashboard, HTML reports,
-fully-enforced dry-run/gas-price safety limits, distributed mode
-(controller/worker across multiple processes — [docs/distributed.md](docs/distributed.md)),
-and a subprocess plugin system ([docs/plugins.md](docs/plugins.md)).
-Still open: an experimental Solana adapter.
+**v0.3** — EVM only, tested against [Anvil](https://book.getfoundry.sh/anvil/).
+All six load models (constant/ramping/spike/stress/soak/arrival-rate),
+encrypted keystores, structured logs, OpenTelemetry tracing, a Grafana
+dashboard, HTML reports, fully-enforced dry-run/gas-price safety limits,
+distributed mode (controller/worker across multiple processes —
+[docs/distributed.md](docs/distributed.md)), and a subprocess plugin
+system ([docs/plugins.md](docs/plugins.md)). A Solana adapter was
+deliberately deferred to v1.0 rather than shipped unverified — see the
+roadmap.
 
 ## Quickstart
 
@@ -145,8 +146,8 @@ Not yet: non-EVM chains. See the roadmap.
 |---|---|
 | v0.1 | MVP: constant/ramping load, EVM, wallet+nonce management, core actions |
 | v0.2 | ✅ all six load models, encrypted keystores, retry policies, structured logs, OpenTelemetry tracing, Grafana dashboard |
-| v0.3 | ✅ HTML reports, full dry-run/gas-price enforcement, distributed mode, plugin system · ⏳ experimental Solana adapter |
-| v1.0 | Stable DSL/schema, Solana GA, adapter conformance suite, docs site |
+| v0.3 | ✅ HTML reports, full dry-run/gas-price enforcement, distributed mode, plugin system |
+| v1.0 | Generalize `chain.Adapter` off EVM-specific types, Solana adapter (verified against a real devnet/test-validator, not shipped speculatively), stable DSL/schema, adapter conformance suite, docs site |
 
 ## Security
 
